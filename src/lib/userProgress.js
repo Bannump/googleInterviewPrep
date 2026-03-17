@@ -34,3 +34,7 @@ export async function saveBehavioralNotes(uid, notes) {
 export async function saveCustomBehavioralPrompts(uid, prompts) {
   await saveUserProgress(uid, { customBehavioralPrompts: prompts });
 }
+
+export async function saveBehavioralPromptOrder(uid, order) {
+  await saveUserProgress(uid, { behavioralPromptOrder: order });
+}
