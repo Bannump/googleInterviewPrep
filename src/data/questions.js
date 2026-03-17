@@ -133,6 +133,7 @@ export const STORAGE_KEYS = {
   BEHAVIORAL_NOTES: 'google-prep-behavioral-notes',
   ACTIVE_TIMER: 'google-prep-active-timer',
   CUSTOM_BEHAVIORAL_PROMPTS: 'google-prep-custom-behavioral-prompts',
+  BEHAVIORAL_PROMPT_ORDER: 'google-prep-behavioral-prompt-order',
 };
 
 /** User-scoped key so each logged-in user has separate Google prep data */
