@@ -30,3 +30,7 @@ export async function saveActiveTimer(uid, payload) {
 export async function saveBehavioralNotes(uid, notes) {
   await saveUserProgress(uid, { behavioralNotes: notes });
 }
+
+export async function saveCustomBehavioralPrompts(uid, prompts) {
+  await saveUserProgress(uid, { customBehavioralPrompts: prompts });
+}
