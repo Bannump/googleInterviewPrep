@@ -149,14 +149,14 @@ export function BehavioralTab() {
           </div>
           <div className="p-4 space-y-4">
             {STAR_FIELDS.map(({ key, label }) => (
-              <div key={key}>
-                <label className="block text-sm text-zinc-400 mb-1">{label}</label>
+              <div key={key} className="flex items-start gap-3">
+                <label className="w-20 shrink-0 text-sm font-bold text-zinc-400 pt-2 text-right">{label}</label>
                 <textarea
                   value={notes[prompt]?.[key] ?? ''}
                   onChange={(e) => setNote(prompt, key, e.target.value)}
                   placeholder={`Your ${label.toLowerCase()}...`}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/50 resize-y"
+                  className="flex-1 px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/50 resize-y"
                 />
               </div>
             ))}
