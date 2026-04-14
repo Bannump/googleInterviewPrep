@@ -7,6 +7,7 @@ import {
   saveBehavioralNotes as saveBehavioralNotesFirestore,
   saveCustomBehavioralPrompts as saveCustomBehavioralPromptsFirestore,
   saveBehavioralPromptOrder as saveBehavioralPromptOrderFirestore,
+  saveDeletedBehavioralPrompts as saveDeletedBehavioralPromptsFirestore,
 } from '../lib/userProgress';
 
 const emptyStar = () => ({ situation: '', task: '', action: '', result: '' });
@@ -69,13 +70,31 @@ function saveOrderLocal(order) {
   } catch (_) {}
 }
 
+function loadDeletedPresetsLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DELETED_BEHAVIORAL_PROMPTS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDeletedPresetsLocal(deleted) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DELETED_BEHAVIORAL_PROMPTS, JSON.stringify(deleted));
+  } catch (_) {}
+}
+
 /** Merge saved order with current preset + custom; drops invalid entries, appends missing. */
-function applyOrder(savedOrder, customPrompts) {
-  const presetSet = new Set(BEHAVIORAL_PROMPTS);
+function applyOrder(savedOrder, customPrompts, deletedPresets = []) {
+  const deletedSet = new Set(deletedPresets);
+  const presetSet = new Set(BEHAVIORAL_PROMPTS.filter((p) => !deletedSet.has(p)));
   const customSet = new Set(customPrompts);
   const valid = (p) => presetSet.has(p) || customSet.has(p);
   const order = (savedOrder && Array.isArray(savedOrder) ? savedOrder : []).filter(valid);
-  for (const p of BEHAVIORAL_PROMPTS) if (!order.includes(p)) order.push(p);
+  for (const p of BEHAVIORAL_PROMPTS) if (!deletedSet.has(p) && !order.includes(p)) order.push(p);
   for (const p of customPrompts) if (!order.includes(p)) order.push(p);
   return order;
 }
@@ -84,13 +103,14 @@ export function useBehavioralNotes() {
   const { user } = useAuth();
   const [customPrompts, setCustomPrompts] = useState(loadCustomPromptsLocal);
   const [savedOrder, setSavedOrder] = useState(loadOrderLocal);
+  const [deletedPresets, setDeletedPresets] = useState(loadDeletedPresetsLocal);
   const [notes, setNotes] = useState(() => {
     const custom = loadCustomPromptsLocal();
     return loadNotesLocal(custom) ?? defaultNotes(custom);
   });
   const firestoreLoadDone = useRef(false);
 
-  const prompts = applyOrder(savedOrder, customPrompts);
+  const prompts = applyOrder(savedOrder, customPrompts, deletedPresets);
 
   // Load from Firestore when user signs in
   useEffect(() => {
@@ -107,6 +127,8 @@ export function useBehavioralNotes() {
         setCustomPrompts(custom);
         const order = Array.isArray(data?.behavioralPromptOrder) ? data.behavioralPromptOrder : null;
         setSavedOrder(order);
+        const deleted = Array.isArray(data?.deletedBehavioralPrompts) ? data.deletedBehavioralPrompts : [];
+        setDeletedPresets(deleted);
         const def = defaultNotes(custom);
         const loaded = data?.behavioralNotes && typeof data.behavioralNotes === 'object'
           ? { ...def, ...data.behavioralNotes }
@@ -116,6 +138,7 @@ export function useBehavioralNotes() {
         if (!cancelled) {
           setCustomPrompts([]);
           setSavedOrder(null);
+          setDeletedPresets([]);
           setNotes(defaultNotes());
         }
       } finally {
@@ -125,35 +148,33 @@ export function useBehavioralNotes() {
     return () => { cancelled = true; };
   }, [user?.uid]);
 
-  // Persist notes: localStorage when no user, Firestore when user (after initial load)
+  // Persist notes
   useEffect(() => {
-    if (!user) {
-      saveNotesLocal(notes);
-      return;
-    }
+    if (!user) { saveNotesLocal(notes); return; }
     if (!firestoreLoadDone.current) return;
     saveBehavioralNotesFirestore(user.uid, notes).catch(() => {});
   }, [user, notes]);
 
-  // Persist custom prompts: localStorage when no user, Firestore when user (after initial load)
+  // Persist custom prompts
   useEffect(() => {
-    if (!user) {
-      saveCustomPromptsLocal(customPrompts);
-      return;
-    }
+    if (!user) { saveCustomPromptsLocal(customPrompts); return; }
     if (!firestoreLoadDone.current) return;
     saveCustomBehavioralPromptsFirestore(user.uid, customPrompts).catch(() => {});
   }, [user, customPrompts]);
 
-  // Persist order: localStorage when no user, Firestore when user (after initial load)
+  // Persist order
   useEffect(() => {
-    if (!user) {
-      saveOrderLocal(prompts);
-      return;
-    }
+    if (!user) { saveOrderLocal(prompts); return; }
     if (!firestoreLoadDone.current) return;
     saveBehavioralPromptOrderFirestore(user.uid, prompts).catch(() => {});
   }, [user, prompts]);
+
+  // Persist deleted presets
+  useEffect(() => {
+    if (!user) { saveDeletedPresetsLocal(deletedPresets); return; }
+    if (!firestoreLoadDone.current) return;
+    saveDeletedBehavioralPromptsFirestore(user.uid, deletedPresets).catch(() => {});
+  }, [user, deletedPresets]);
 
   const setNote = useCallback((prompt, field, value) => {
     setNotes((prev) => ({
@@ -178,26 +199,34 @@ export function useBehavioralNotes() {
     }));
   }, []);
 
-  const removeCustomPrompt = useCallback((prompt) => {
-    setCustomPrompts((prev) => prev.filter((p) => p !== prompt));
+  /** Delete any prompt — custom or preset. */
+  const deletePrompt = useCallback((prompt) => {
+    const isCustom = customPrompts.includes(prompt);
+    if (isCustom) {
+      setCustomPrompts((prev) => prev.filter((p) => p !== prompt));
+    } else {
+      // Mark preset as deleted so it's filtered out of the list
+      setDeletedPresets((prev) => prev.includes(prompt) ? prev : [...prev, prompt]);
+    }
+    // Remove from saved order and notes either way
     setSavedOrder((prev) => (prev && Array.isArray(prev) ? prev.filter((p) => p !== prompt) : null));
     setNotes((prev) => {
       const next = { ...prev };
       delete next[prompt];
       return next;
     });
-  }, []);
+  }, [customPrompts]);
 
   const reorderPrompts = useCallback((fromIndex, toIndex) => {
     setSavedOrder((prev) => {
       const list = prev && Array.isArray(prev) ? [...prev] : [...BEHAVIORAL_PROMPTS, ...customPrompts];
-      const merged = applyOrder(list, customPrompts);
+      const merged = applyOrder(list, customPrompts, deletedPresets);
       if (fromIndex < 0 || fromIndex >= merged.length || toIndex < 0 || toIndex >= merged.length) return list;
       const [item] = merged.splice(fromIndex, 1);
       merged.splice(toIndex, 0, item);
       return merged;
     });
-  }, [customPrompts]);
+  }, [customPrompts, deletedPresets]);
 
   return {
     prompts,
@@ -205,7 +234,7 @@ export function useBehavioralNotes() {
     notes,
     setNote,
     addCustomPrompt,
-    removeCustomPrompt,
+    deletePrompt,
     reorderPrompts,
   };
 }

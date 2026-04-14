@@ -38,3 +38,7 @@ export async function saveCustomBehavioralPrompts(uid, prompts) {
 export async function saveBehavioralPromptOrder(uid, order) {
   await saveUserProgress(uid, { behavioralPromptOrder: order });
 }
+
+export async function saveDeletedBehavioralPrompts(uid, deleted) {
+  await saveUserProgress(uid, { deletedBehavioralPrompts: deleted });
+}

@@ -177,6 +177,7 @@ export const STORAGE_KEYS = {
   ACTIVE_TIMER: 'google-prep-active-timer',
   CUSTOM_BEHAVIORAL_PROMPTS: 'google-prep-custom-behavioral-prompts',
   BEHAVIORAL_PROMPT_ORDER: 'google-prep-behavioral-prompt-order',
+  DELETED_BEHAVIORAL_PROMPTS: 'google-prep-deleted-behavioral-prompts',
 };
 
 /** User-scoped key so each logged-in user has separate Google prep data */
