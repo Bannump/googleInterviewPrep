@@ -7,7 +7,7 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function QuestionTimer({ progress, isActive, onStart, onPause, onFinish, disabled }) {
+export function QuestionTimer({ progress, isActive, onStart, onPause, onFinish }) {
   const [liveSeconds, setLiveSeconds] = useState(0);
 
   const totalElapsed = progress.timeSpent + (progress.runningSince ? liveSeconds : 0);
@@ -35,8 +35,7 @@ export function QuestionTimer({ progress, isActive, onStart, onPause, onFinish, 
         <button
           type="button"
           onClick={onStart}
-          disabled={disabled}
-          className="p-1.5 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-blue-500 text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[36px] touch-manipulation"
+          className="p-1.5 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-blue-500 text-blue-400 transition-colors min-h-[36px] touch-manipulation"
           title="Start timer"
         >
           <Play className="w-4 h-4" />
