@@ -32,6 +32,17 @@ body {
   overflow-x: hidden;
 }
 
+/* Behavioral question blink on expand/collapse */
+@keyframes story-blink {
+  0%   { background-color: transparent; }
+  30%  { background-color: rgba(147, 197, 253, 0.15); } /* light blue flash */
+  70%  { background-color: rgba(147, 197, 253, 0.15); }
+  100% { background-color: transparent; }
+}
+.story-blink {
+  animation: story-blink 0.55s ease-out forwards;
+}
+
 /* Match Amazon Prep utilities */
 @layer utilities {
   .scrollbar-hide {

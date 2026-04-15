@@ -1,9 +1,42 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useBehavioralNotes } from '../hooks/useBehavioralNotes';
 import {
   MessageCircle, Plus, Trash2, ChevronDown, ChevronRight,
   Search, ChevronsDownUp, ChevronsUpDown, GripVertical,
 } from 'lucide-react';
+
+// Auto-resizing textarea: grows to fit content, never shows an internal scrollbar.
+function AutoResizeTextarea({ value, onChange, placeholder, className, minRows = 2 }) {
+  const ref = useRef(null);
+
+  const resize = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  // Resize whenever value changes
+  useEffect(() => { resize(); }, [value, resize]);
+
+  // Resize after the browser has painted (handles accordion open / font load)
+  useEffect(() => {
+    const id = requestAnimationFrame(resize);
+    return () => cancelAnimationFrame(id);
+  }, [resize]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => { onChange(e); resize(); }}
+      placeholder={placeholder}
+      rows={minRows}
+      style={{ resize: 'none', overflow: 'hidden' }}
+      className={className}
+    />
+  );
+}
 
 const STAR_FIELDS = [
   { key: 'situation', label: 'Situation' },
@@ -18,6 +51,7 @@ export function BehavioralTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedStories, setExpandedStories] = useState(new Set());
+  const [flashingStory, setFlashingStory] = useState(null);
   // Drag state
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -30,6 +64,12 @@ export function BehavioralTab() {
       if (next.has(prompt)) next.delete(prompt);
       else next.add(prompt);
       return next;
+    });
+    // Trigger blink: clear first so re-clicking the same card re-runs the animation
+    setFlashingStory(null);
+    requestAnimationFrame(() => {
+      setFlashingStory(prompt);
+      setTimeout(() => setFlashingStory(null), 600);
     });
   };
   const expandAll = () => setExpandedStories(new Set(prompts));
@@ -193,7 +233,7 @@ export function BehavioralTab() {
           >
             {/* Header */}
             <div
-              className="flex items-center justify-between gap-2 px-3 py-3 text-zinc-100 font-medium bg-zinc-900/30 hover:bg-zinc-800/40 transition-colors"
+              className={`flex items-center justify-between gap-2 px-3 py-3 text-zinc-100 font-medium bg-zinc-900/30 hover:bg-zinc-800/40 transition-colors${flashingStory === prompt ? ' story-blink' : ''}`}
             >
               {/* Drag handle — only this initiates the drag visually */}
               <span
@@ -207,7 +247,7 @@ export function BehavioralTab() {
               {/* Question title — click to expand/collapse */}
               <button
                 type="button"
-                className="flex-1 min-w-0 flex items-center gap-2 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                className="flex-1 min-w-0 flex items-center gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                 onClick={() => toggleStory(prompt)}
                 aria-expanded={isExpanded}
               >
@@ -237,12 +277,11 @@ export function BehavioralTab() {
                     <label className="w-20 shrink-0 text-sm font-bold text-zinc-400 pt-2 text-right">
                       {label}
                     </label>
-                    <textarea
+                    <AutoResizeTextarea
                       value={notes[prompt]?.[key] ?? ''}
                       onChange={(e) => setNote(prompt, key, e.target.value)}
                       placeholder={`Your ${label.toLowerCase()}...`}
-                      rows={3}
-                      className="flex-1 px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/50 resize-y"
+                      className="flex-1 px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/50"
                     />
                   </div>
                 ))}
@@ -260,12 +299,12 @@ export function BehavioralTab() {
         <div className="p-4 space-y-4">
           <div>
             <label className="block text-sm text-zinc-400 mb-1">Story question</label>
-            <textarea
+            <AutoResizeTextarea
               value={newStoryQuestion}
               onChange={(e) => setNewStoryQuestion(e.target.value)}
               placeholder="e.g. Tell me about a time you delivered under a tight deadline."
-              rows={2}
-              className="w-full px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/50 resize-y"
+              minRows={2}
+              className="w-full px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/50"
             />
           </div>
           <button
