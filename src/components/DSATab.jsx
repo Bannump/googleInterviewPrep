@@ -64,11 +64,9 @@ function groupByCategory(questions) {
 
 function QuestionRow({ q, prog, rowNumber, activeTimer, toggleComplete, startTimer, pauseTimer, finishTimer, resetQuestion, hideCategory }) {
   const isActive = activeTimer && activeTimer.id === q.id;
-  const anotherRunning = activeTimer && activeTimer.id !== q.id;
-  const canAutoStart = !prog.completed && !anotherRunning;
 
   const handleTitleClick = () => {
-    if (canAutoStart) startTimer(q.id);
+    if (!prog.completed) startTimer(q.id);
   };
 
   return (
@@ -117,7 +115,6 @@ function QuestionRow({ q, prog, rowNumber, activeTimer, toggleComplete, startTim
             onStart={() => startTimer(q.id)}
             onPause={() => pauseTimer(q.id)}
             onFinish={() => finishTimer(q.id)}
-            disabled={anotherRunning}
           />
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
