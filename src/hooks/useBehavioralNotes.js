@@ -10,7 +10,7 @@ import {
   saveDeletedBehavioralPrompts as saveDeletedBehavioralPromptsFirestore,
 } from '../lib/userProgress';
 
-const emptyStar = () => ({ situation: '', task: '', action: '', result: '' });
+const emptyStar = () => ({ situation: '', task: '', action: '', result: '', storyFlow: '' });
 
 const defaultNotes = (customPrompts = []) =>
   [...BEHAVIORAL_PROMPTS, ...customPrompts].reduce((acc, prompt) => {
