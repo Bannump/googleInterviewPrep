@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useBehavioralNotes } from '../hooks/useBehavioralNotes';
 import {
-  MessageCircle, Plus, Trash2, ChevronDown, ChevronRight,
-  Search, ChevronsDownUp, ChevronsUpDown, GripVertical,
+  MessageCircle, Plus, Trash2, ChevronRight,
+  Search, ChevronsDownUp, ChevronsUpDown, GripVertical, Pencil, Check, X,
 } from 'lucide-react';
 
 // Auto-resizing textarea: grows to fit content, never shows an internal scrollbar.
@@ -46,7 +46,7 @@ const STAR_FIELDS = [
 ];
 
 export function BehavioralTab() {
-  const { prompts, notes, setNote, addCustomPrompt, deletePrompt, reorderPrompts } = useBehavioralNotes();
+  const { prompts, notes, setNote, addCustomPrompt, deletePrompt, reorderPrompts, renamePrompt } = useBehavioralNotes();
   const [newStoryQuestion, setNewStoryQuestion] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -55,6 +55,10 @@ export function BehavioralTab() {
   // Drag state
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  // Edit-question state: maps prompt → draft text (null = not editing)
+  const [editingPrompt, setEditingPrompt] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
+  const editInputRef = useRef(null);
   const searchContainerRef = useRef(null);
 
   // ── Accordion helpers ────────────────────────────────────────────────────
@@ -101,6 +105,34 @@ export function BehavioralTab() {
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
+
+  // ── Question editing ─────────────────────────────────────────────────────
+  const startEditing = (e, prompt) => {
+    e.stopPropagation();
+    setEditingPrompt(prompt);
+    setEditDraft(prompt);
+  };
+
+  const commitEdit = () => {
+    if (editingPrompt !== null) {
+      renamePrompt(editingPrompt, editDraft);
+      setEditingPrompt(null);
+      setEditDraft('');
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingPrompt(null);
+    setEditDraft('');
+  };
+
+  // Focus the input when edit mode opens
+  useEffect(() => {
+    if (editingPrompt !== null && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingPrompt]);
 
   // ── Story search / jump ──────────────────────────────────────────────────
   const handleAddStory = () => {
@@ -217,8 +249,8 @@ export function BehavioralTab() {
           <section
             id={`story-${index}`}
             key={prompt}
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
+            draggable={editingPrompt !== prompt}
+            onDragStart={(e) => editingPrompt !== prompt && handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
             onDragEnd={handleDragEnd}
@@ -235,7 +267,7 @@ export function BehavioralTab() {
             <div
               className={`flex items-center justify-between gap-2 px-3 py-3 text-zinc-100 font-medium bg-zinc-900/30 hover:bg-zinc-800/40 transition-colors${flashingStory === prompt ? ' story-blink' : ''}`}
             >
-              {/* Drag handle — only this initiates the drag visually */}
+              {/* Drag handle */}
               <span
                 className="shrink-0 flex items-center cursor-grab active:cursor-grabbing text-zinc-500 hover:text-zinc-300 px-0.5"
                 title="Drag to reorder"
@@ -244,29 +276,79 @@ export function BehavioralTab() {
                 <GripVertical className="w-4 h-4" />
               </span>
 
-              {/* Question title — click to expand/collapse */}
-              <button
-                type="button"
-                className="flex-1 min-w-0 flex items-center gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
-                onClick={() => toggleStory(prompt)}
-                aria-expanded={isExpanded}
-              >
-                <h3 className="flex-1 min-w-0 text-sm sm:text-base">{prompt}</h3>
-                <ChevronRight
-                  className={`shrink-0 w-4 h-4 text-zinc-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
-                />
-              </button>
+              {editingPrompt === prompt ? (
+                /* ── Inline edit mode ── */
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editDraft}
+                    onChange={(e) => setEditDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+                      if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+                    }}
+                    className="flex-1 min-w-0 px-2 py-1 rounded border border-blue-500 bg-zinc-950 text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    aria-label="Edit question text"
+                  />
+                  <button
+                    type="button"
+                    onClick={commitEdit}
+                    className="shrink-0 p-1 rounded text-green-400 hover:text-green-300 hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Save"
+                    aria-label="Save question"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="shrink-0 p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Cancel"
+                    aria-label="Cancel edit"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                /* ── Normal mode ── */
+                <button
+                  type="button"
+                  className="flex-1 min-w-0 flex items-center gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                  onClick={() => toggleStory(prompt)}
+                  aria-expanded={isExpanded}
+                >
+                  <h3 className="flex-1 min-w-0 text-sm sm:text-base">{prompt}</h3>
+                  <ChevronRight
+                    className={`shrink-0 w-4 h-4 text-zinc-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                  />
+                </button>
+              )}
 
-              {/* Delete — available for all prompts */}
-              <button
-                type="button"
-                onClick={() => deletePrompt(prompt)}
-                className="shrink-0 p-1 rounded text-zinc-400 hover:text-red-400 hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                title="Remove this story"
-                aria-label="Remove this story"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {editingPrompt !== prompt && (
+                <>
+                  {/* Edit question */}
+                  <button
+                    type="button"
+                    onClick={(e) => startEditing(e, prompt)}
+                    className="shrink-0 p-1 rounded text-zinc-400 hover:text-blue-400 hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Edit question"
+                    aria-label="Edit question"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  {/* Delete */}
+                  <button
+                    type="button"
+                    onClick={() => deletePrompt(prompt)}
+                    className="shrink-0 p-1 rounded text-zinc-400 hover:text-red-400 hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Remove this story"
+                    aria-label="Remove this story"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Collapsible STAR fields */}

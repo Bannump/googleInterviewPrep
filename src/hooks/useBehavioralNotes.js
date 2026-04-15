@@ -228,6 +228,28 @@ export function useBehavioralNotes() {
     });
   }, [customPrompts, deletedPresets]);
 
+  const renamePrompt = useCallback((oldPrompt, newText) => {
+    const newPrompt = (newText || '').trim();
+    if (!newPrompt || newPrompt === oldPrompt) return;
+    const isCustom = customPrompts.includes(oldPrompt);
+    if (isCustom) {
+      setCustomPrompts((prev) => prev.map((p) => (p === oldPrompt ? newPrompt : p)));
+    } else {
+      // Treat renamed preset as: delete old preset, add new custom prompt
+      setDeletedPresets((prev) => prev.includes(oldPrompt) ? prev : [...prev, oldPrompt]);
+      setCustomPrompts((prev) => prev.includes(newPrompt) ? prev : [...prev, newPrompt]);
+    }
+    setSavedOrder((prev) =>
+      prev && Array.isArray(prev) ? prev.map((p) => (p === oldPrompt ? newPrompt : p)) : null
+    );
+    setNotes((prev) => {
+      const next = { ...prev };
+      next[newPrompt] = prev[oldPrompt] ?? emptyStar();
+      delete next[oldPrompt];
+      return next;
+    });
+  }, [customPrompts]);
+
   return {
     prompts,
     customPrompts,
@@ -236,5 +258,6 @@ export function useBehavioralNotes() {
     addCustomPrompt,
     deletePrompt,
     reorderPrompts,
+    renamePrompt,
   };
 }
