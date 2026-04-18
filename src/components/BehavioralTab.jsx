@@ -46,7 +46,7 @@ const STAR_FIELDS = [
 ];
 
 export function BehavioralTab() {
-  const { prompts, notes, setNote, addCustomPrompt, deletePrompt, reorderPrompts, renamePrompt } = useBehavioralNotes();
+  const { prompts, customPrompts, notes, setNote, addCustomPrompt, deletePrompt, restorePrompt, reorderPrompts, renamePrompt } = useBehavioralNotes();
   const [newStoryQuestion, setNewStoryQuestion] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -60,6 +60,10 @@ export function BehavioralTab() {
   const [editDraft, setEditDraft] = useState('');
   const editInputRef = useRef(null);
   const searchContainerRef = useRef(null);
+  // Delete confirmation + undo
+  const [confirmingDelete, setConfirmingDelete] = useState(null); // prompt string awaiting confirmation
+  const [undoItem, setUndoItem] = useState(null); // { prompt, isCustom, noteData, index }
+  const undoTimerRef = useRef(null);
 
   // ── Accordion helpers ────────────────────────────────────────────────────
   const toggleStory = (prompt) => {
@@ -133,6 +137,34 @@ export function BehavioralTab() {
       editInputRef.current.select();
     }
   }, [editingPrompt]);
+
+  // ── Delete with confirmation + undo ─────────────────────────────────────
+  const handleDeleteClick = (e, prompt) => {
+    e.stopPropagation();
+    setConfirmingDelete(prompt);
+  };
+
+  const confirmDelete = () => {
+    const prompt = confirmingDelete;
+    const isCustom = customPrompts.includes(prompt);
+    const noteData = notes[prompt];
+    const index = prompts.indexOf(prompt);
+    deletePrompt(prompt);
+    setConfirmingDelete(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoItem({ prompt, isCustom, noteData, index });
+    undoTimerRef.current = setTimeout(() => setUndoItem(null), 8000);
+  };
+
+  const handleUndo = () => {
+    if (!undoItem) return;
+    restorePrompt(undoItem.prompt, undoItem.isCustom, undoItem.noteData, undoItem.index);
+    setUndoItem(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+  };
+
+  // Clean up undo timer on unmount
+  useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); }, []);
 
   // ── Story search / jump ──────────────────────────────────────────────────
   const handleAddStory = () => {
@@ -340,7 +372,7 @@ export function BehavioralTab() {
                   {/* Delete */}
                   <button
                     type="button"
-                    onClick={() => deletePrompt(prompt)}
+                    onClick={(e) => handleDeleteClick(e, prompt)}
                     className="shrink-0 p-1 rounded text-zinc-400 hover:text-red-400 hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     title="Remove this story"
                     aria-label="Remove this story"
@@ -387,6 +419,75 @@ export function BehavioralTab() {
           </section>
         );
       })}
+
+      {/* Delete confirmation modal */}
+      {confirmingDelete !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+        >
+          <div className="w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="shrink-0 mt-0.5 p-2 rounded-lg bg-red-500/10">
+                <Trash2 className="w-4 h-4 text-red-400" />
+              </span>
+              <div className="space-y-1 min-w-0">
+                <h2 id="delete-dialog-title" className="text-zinc-100 font-semibold text-sm">
+                  Delete this story?
+                </h2>
+                <p className="text-zinc-400 text-sm leading-relaxed line-clamp-2">
+                  "{confirmingDelete}"
+                </p>
+              </div>
+            </div>
+            <p className="text-zinc-400 text-sm leading-relaxed">
+              You can undo this deletion during the current session. Once you refresh or close the tab, it becomes permanent.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(null)}
+                className="flex-1 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-200 text-sm font-medium hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo toast */}
+      {undoItem !== null && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl max-w-sm w-full mx-4">
+          <p className="flex-1 text-zinc-300 text-sm truncate">
+            Story deleted
+          </p>
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="shrink-0 px-3 py-1 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndoItem(null)}
+            className="shrink-0 p-1 rounded text-zinc-500 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Add your own story */}
       <section className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 overflow-hidden border-dashed">
